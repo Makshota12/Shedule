@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Расписание занятий</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>Расписание занятий</h1>
+    <p class="subtitle">осенний семестр 2026</p>
+  </header>
+
+  <main class="container">
+
+    <div class="controls">
+      <div class="week-switch">
+        <button class="week-btn active" data-week="auto">Авто</button>
+        <button class="week-btn" data-week="1">1 неделя</button>
+        <button class="week-btn" data-week="2">2 неделя</button>
+      </div>
+      <div class="current-week" id="currentWeekLabel"></div>
+      <button id="printBtn" class="print-btn">🖨 Печать</button>
+    </div>
+
+    <div class="schedule-wrapper">
+      <table class="schedule" id="scheduleTable">
+        <!-- Таблица генерируется скриптом -->
+      </table>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>Обновлено: <span id="updated"></span></p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
