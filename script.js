@@ -2,7 +2,6 @@
 // НАСТРОЙКИ
 // =====================================================================
 
-// Дата первого понедельника, когда начинается 1-я неделя.
 const START_DATE = new Date("2026-08-31"); // ← поменяйте на свою дату
 
 // =====================================================================
@@ -68,8 +67,9 @@ const schedule = [
 const DAYS = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
 const TYPE_CLASS = { "ПР": "practice", "ЛК": "lecture", "ЛАБ": "lab" };
 
-let currentMode = "auto";   // "auto" | "1" | "2"
-let currentView = "week";   // "week" | "today"
+let currentMode = "auto";
+let currentView = "week";
+let refreshTimer = null;
 
 function getAutoWeek() {
   const start = new Date(START_DATE);
@@ -86,38 +86,103 @@ function getActiveWeek() {
   return parseInt(currentMode, 10);
 }
 
-/**
- * Возвращает индекс сегодняшнего дня недели в формате:
- * 0 = Пн, 1 = Вт, ... 5 = Сб, 6 = Вс
- */
 function getTodayIndex() {
-  const jsDay = new Date().getDay(); // 0=Вс, 1=Пн, ... 6=Сб
-  return (jsDay + 6) % 7;            // 0=Пн, ... 6=Вс
+  const jsDay = new Date().getDay();
+  return (jsDay + 6) % 7;
+}
+
+/**
+ * Переводит строку "12:40 - 14:10" в {start: минуты, end: минуты}.
+ */
+function parseTimeRange(str) {
+  const parts = str.split("-").map(s => s.trim());
+  const toMin = t => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + (m || 0);
+  };
+  return { start: toMin(parts[0]), end: toMin(parts[1]) };
 }
 
 function timeToMinutes(str) {
-  const start = str.split("-")[0].trim();
-  const parts = start.split(":").map(Number);
-  return parts[0] * 60 + (parts[1] || 0);
+  return parseTimeRange(str).start;
+}
+
+/**
+ * Определяет статус для каждой пары сегодня:
+ *   "past"    — уже прошла
+ *   "current" — идёт сейчас
+ *   "next"    — следующая
+ *   "future"  — ещё не скоро
+ *
+ * Возвращает Map: ключ — объект пары, значение — статус.
+ */
+function getTodayStatuses(dayItems) {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const statuses = new Map();
+  let nextAssigned = false;
+
+  // Сортируем по времени начала
+  const sorted = [...dayItems].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+
+  // Определяем текущую
+  let currentItem = null;
+  for (const item of sorted) {
+    const { start, end } = parseTimeRange(item.time);
+    if (nowMinutes >= start && nowMinutes < end) {
+      currentItem = item;
+      statuses.set(item, "current");
+      break;
+    }
+  }
+
+  // Проставляем остальным
+  for (const item of sorted) {
+    if (statuses.has(item)) continue;
+    const { start, end } = parseTimeRange(item.time);
+
+    if (nowMinutes >= end) {
+      statuses.set(item, "past");
+    } else if (!nextAssigned) {
+      statuses.set(item, "next");
+      nextAssigned = true;
+    } else {
+      statuses.set(item, "future");
+    }
+  }
+
+  return statuses;
 }
 
 /**
  * Рисует карточку занятия.
  */
-function renderCard(item) {
+function renderCard(item, status = null) {
   const cls = TYPE_CLASS[item.type] || "practice";
+  let statusBadge = "";
+  let extraClass = "";
+
+  if (status === "current") {
+    extraClass = " is-current";
+    statusBadge = `<span class="status-badge current"><span class="pulse"></span>Сейчас идёт</span>`;
+  } else if (status === "next") {
+    extraClass = " is-next";
+    statusBadge = `<span class="status-badge next">Далее</span>`;
+  } else if (status === "past") {
+    extraClass = " is-past";
+  }
+
   return `
-    <div class="card ${cls}">
+    <div class="card ${cls}${extraClass}">
       <div class="subject">${item.subject}</div>
       <div class="meta">${item.group}</div>
       <div class="meta room">${item.room}</div>
       <div class="type">${item.type}</div>
+      ${statusBadge}
     </div>`;
 }
 
-/**
- * Обычный вид: вся неделя.
- */
 function renderWeek(weekItems) {
   const table = document.getElementById("scheduleTable");
 
@@ -135,7 +200,7 @@ function renderWeek(weekItems) {
       if (items.length === 0) {
         html += "<td></td>";
       } else {
-        html += "<td>" + items.map(renderCard).join("") + "</td>";
+        html += "<td>" + items.map(i => renderCard(i, null)).join("") + "</td>";
       }
     }
     html += "</tr>";
@@ -146,14 +211,10 @@ function renderWeek(weekItems) {
   table.classList.remove("today-view");
 }
 
-/**
- * Вид "Сегодня": одна колонка — только текущий день.
- */
 function renderToday(weekItems) {
   const table = document.getElementById("scheduleTable");
   const today = getTodayIndex();
 
-  // Воскресенье — занятий нет
   if (today === 6) {
     table.classList.add("today-view");
     table.innerHTML = `
@@ -179,12 +240,14 @@ function renderToday(weekItems) {
     return;
   }
 
+  const statuses = getTodayStatuses(dayItems);
+
   let html = `<thead><tr><th colspan="2">Сегодня — ${dayName}</th></tr></thead><tbody>`;
   dayItems.forEach(item => {
     html += `
       <tr>
         <td class="time-cell">${item.time.replace(" - ", "<br>– ")}</td>
-        <td>${renderCard(item)}</td>
+        <td>${renderCard(item, statuses.get(item))}</td>
       </tr>`;
   });
   html += "</tbody>";
@@ -203,12 +266,10 @@ function buildTable() {
     renderWeek(weekItems);
   }
 
-  // Подпись
   const label = document.getElementById("currentWeekLabel");
   const todayName = DAYS[getTodayIndex()];
   label.textContent = `Показана: ${week}-я неделя · сегодня ${todayName.toLowerCase()}`;
 
-  // Активные кнопки
   document.querySelectorAll(".week-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.week === String(currentMode));
   });
@@ -221,6 +282,22 @@ function setUpdated() {
   const now = new Date();
   document.getElementById("updated").textContent =
     now.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+}
+
+/**
+ * Автообновление подсветки раз в 30 секунд.
+ * Важно: не пересоздаём таблицу, если пользователь в режиме "week",
+ * но и там обновление не помешает (просто перерисуем).
+ */
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    if (currentView === "today") {
+      const week = getActiveWeek();
+      const weekItems = schedule.filter(item => item.week === week);
+      renderToday(weekItems);
+    }
+  }, 30 * 1000);
 }
 
 // Обработчики
@@ -243,3 +320,4 @@ document.getElementById("printBtn").addEventListener("click", () => window.print
 // Инициализация
 buildTable();
 setUpdated();
+startAutoRefresh();
