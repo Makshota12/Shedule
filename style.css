@@ -221,3 +221,77 @@ table.schedule.today-view .card .meta {
   .card { break-inside: avoid; }
   table.schedule { min-width: auto; font-size: 11px; }
 }
+
+/* ==== Подсветка текущей и следующей пары ==== */
+
+.card.is-past {
+  opacity: 0.45;
+  filter: grayscale(0.3);
+}
+
+.card.is-current {
+  border-left-color: #16a34a !important;
+  background: #dcfce7 !important;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+}
+
+.card.is-next {
+  border-left-color: #2563eb !important;
+  background: #dbeafe !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+/* Бейджи статуса */
+.status-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-badge.current {
+  background: #16a34a;
+  color: #fff;
+}
+
+.status-badge.next {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* Пульсирующая точка у "Сейчас идёт" */
+.pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  position: relative;
+  display: inline-block;
+}
+
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  animation: pulse 1.4s ease-out infinite;
+}
+
+@keyframes pulse {
+  0%   { transform: scale(0.7); opacity: 1; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* В режиме "Сегодня" карточкам нужно место снизу под бейдж */
+table.schedule.today-view .card {
+  padding-bottom: 28px;
+}
